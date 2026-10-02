@@ -47,11 +47,24 @@ app.mount("/api/facility", facility)
 @app.get("/api/blobtest")
 def blob_test():
     """Probe Vercel Blob OIDC auth end to end (PUT then GET)."""
+    import os
+    import traceback
     from mizani.blobstore import BlobClient
-    b = BlobClient()
-    out = b.put("mizani/probe.txt", b"hello from mizani")
-    got = b.get("mizani/probe.txt")
-    return {"put": out.get("url", "")[:80], "get": got}
+    try:
+        b = BlobClient()
+        out = b.put("mizani/probe.txt", b"hello from mizani")
+        got = b.get("mizani/probe.txt")
+        return {"put": out.get("url", "")[:80], "get": got}
+    except Exception as exc:
+        import httpx
+        detail = {"error": type(exc).__name__, "message": str(exc)[:300],
+                  "has_oidc": bool(os.environ.get("VERCEL_OIDC_TOKEN")),
+                  "has_store": bool(os.environ.get("BLOB_STORE_ID")),
+                  "trace": traceback.format_exc()[-800:]}
+        if isinstance(exc, httpx.HTTPStatusError):
+            detail["status"] = exc.response.status_code
+            detail["body"] = exc.response.text[:300]
+        return detail
 
 @app.get("/api/health")
 def agents_health():
