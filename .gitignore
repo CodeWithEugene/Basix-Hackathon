@@ -27,3 +27,4 @@ agent/memory/
 .DS_Store
 .vercel
 .env*
+.vercel/
