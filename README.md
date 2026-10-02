@@ -10,7 +10,9 @@
 | **Solo challenge** | 01: One agent producing an auditable decision |
 | **Team** | Technetians (Eugene Mutembei, solo) |
 | **Demo video** | _Link added at submission_ |
-| **Status** | Docs complete; alpha in build (see [docs/build.md](docs/build.md)) |
+| **Status** | Working alpha: both agents, the web app, and tests all run (see below) |
+
+![The reconciliation screen: two witnesses, the reconciled decision, and the premise ledger](docs/images/reconciliation-emergency.png)
 
 > **Decision support, not diagnosis.** Mizani is a hackathon prototype. It is not a certified medical device and must not be used for real patients. All data in this repository is synthetic.
 
@@ -63,8 +65,6 @@ Details, endpoints, atoms and rules: [docs/build.md](docs/build.md).
 
 ## Run It
 
-> The commands below are the target interface defined in [docs/build.md](docs/build.md) section 16. They become runnable as the build lands.
-
 Prerequisites (macOS): Homebrew, then `brew install swi-prolog uv pnpm`, and Node 20+.
 
 ```bash
@@ -75,6 +75,8 @@ make setup
 make seed
 make dev
 ```
+
+Then open http://localhost:3000. The community agent runs on :8101 (edge pack), the facility agent on :8102 (full pack). `make test` runs the pytest suite (32 tests, including golden NAL proofs for all three scenarios) and the Playwright demo path.
 
 `TYPESAFE_API_KEY` in `.env` is optional. Without it, notes fall back to manual danger-sign toggles, which is also how the offline community agent works.
 
@@ -87,7 +89,12 @@ make dev
 | [docs/solution.md](docs/solution.md) | The full solution end to end |
 | [docs/build.md](docs/build.md) | The build spec: architecture, MeTTa design, API, UI, tests, video plan |
 | [docs/research.md](docs/research.md) | Research log and full bibliography |
+| [docs/transcript.md](docs/transcript.md) | Sample reasoning transcript of Scenario A, with verbatim NAL proofs |
+| [docs/audit-trail.md](docs/audit-trail.md) | One-page audit trail of Amina's referral |
+| [docs/ai-disclosure.md](docs/ai-disclosure.md) | The mandatory AI disclosure |
 | `agent/` | Omega agents (FastAPI + PeTTa + MeTTa plugin) |
+| `agent/plugins/mizani/` | The MeTTa plugin: evidence, reason, edge and full rule packs |
+| `agent/vendor/` | Pinned submodules: `singnet/Omega` @ `31ff0aad`, `trueagi-io/PeTTa` @ v1.0.4 |
 | `web/` | Next.js app with pure shadcn/ui |
 
 ## AI Disclosure

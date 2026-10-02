@@ -21,7 +21,7 @@ web/test-results/
 web/playwright-report/
 
 # Agent runtime memory (regenerate with `make seed`)
-agent/memory/*.metta
+agent/memory/
 
 # OS
 .DS_Store

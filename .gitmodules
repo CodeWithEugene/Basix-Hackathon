@@ -1,0 +1,6 @@
+[submodule "agent/vendor/omega"]
+	path = agent/vendor/omega
+	url = https://github.com/singnet/Omega.git
+[submodule "agent/vendor/petta"]
+	path = agent/vendor/petta
+	url = https://github.com/trueagi-io/PeTTa.git
