@@ -178,6 +178,19 @@ wheels = [
 ]
 
 [[package]]
+name = "hyperon"
+version = "0.2.10"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e8/83/5f5161ea20744f9f50c28b87629c889af6922f71f4ecac485016dd947312/hyperon-0.2.10-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:a12fb7196c604d2e730d7cee315130d1288e9e5519b5d5b751153de005848d00", size = 7174858, upload-time = "2026-02-11T12:26:44.059Z" },
+    { url = "https://files.pythonhosted.org/packages/6a/a5/103378da42108862c7d7e57137682f70a699ba80a58f716b69ff55983215/hyperon-0.2.10-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:f67eb5ab049af6b927b38a1bdcc0e33c8ed31d0bf7e07e0fb8486ec4ed8b6743", size = 7078309, upload-time = "2026-02-11T12:26:46.594Z" },
+    { url = "https://files.pythonhosted.org/packages/e3/a7/a17c8890b2837cde269d546abf94ade5ac34a986c15ad4bbb0078d40aae4/hyperon-0.2.10-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:de1bb08ab3fb13445cc13f0d2f4b103d19cf2ddf2743094d780acfd99bad6f6c", size = 6789397, upload-time = "2026-02-11T12:26:48.548Z" },
+    { url = "https://files.pythonhosted.org/packages/df/79/6421df2576893ab0b807b8de8088b2955cc4d902964410b78eb36b5bb86c/hyperon-0.2.10-cp312-cp312-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:c05f7f8330bc1b42e5e1c3757e43992463a5fcf35c3c8b4bb08ba6e35c6a87f7", size = 7489998, upload-time = "2026-02-11T12:26:50.184Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/dc/56194cd1e18924953dfb07187d39a076323e5782b59ab57f64c60e6d768d/hyperon-0.2.10-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:12a0479df6afadda7562ffe10e7d63a6701aaec02f7177b91412bc05a09ed419", size = 7352727, upload-time = "2026-02-11T12:26:52.48Z" },
+    { url = "https://files.pythonhosted.org/packages/01/19/e64a2ba963dc384cbf0a2d7541e68f0b184367141952d7b5315098120984/hyperon-0.2.10-cp312-cp312-win_amd64.whl", hash = "sha256:57b065b95255dbe313cf6892be670c5602d6092e23e25a9e454027d913a71d56", size = 5449078, upload-time = "2026-02-11T12:26:55.452Z" },
+]
+
+[[package]]
 name = "idna"
 version = "3.20"
 source = { registry = "https://pypi.org/simple" }
@@ -217,6 +230,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "hyperon" },
     { name = "pytest" },
     { name = "pytest-cov" },
 ]
@@ -234,6 +248,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "hyperon", specifier = "==0.2.10" },
     { name = "pytest", specifier = ">=8" },
     { name = "pytest-cov", specifier = ">=5" },
 ]

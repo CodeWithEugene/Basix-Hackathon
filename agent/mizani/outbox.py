@@ -2,39 +2,34 @@
 
 Packets wait in a JSON outbox while the facility is unreachable. The sync
 loop retries every few seconds when online; the UI connectivity toggle and
-the background loop both drive flushing.
+the background loop both drive flushing. The queue lives in the configured
+store (local file in development, Vercel Blob in serverless deployment).
 """
 from __future__ import annotations
 
 import asyncio
 import json
-import os
-from pathlib import Path
 
 import httpx
 
 
 class Outbox:
-    def __init__(self, memory_dir: Path, peer_url: str | None):
-        self.path = Path(memory_dir) / "outbox-community.json"
+    def __init__(self, store, peer_url: str | None):
+        self.store = store
+        self.name = "outbox-community.json"
         self.peer = (peer_url or "").rstrip("/") or None
         self.online = False
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
 
     def pending(self) -> list[dict]:
-        if not self.path.exists():
-            return []
         try:
-            return json.loads(self.path.read_text())
+            return json.loads(self.store.read(self.name) or "[]")
         except json.JSONDecodeError:
             return []
 
     def _write(self, packets: list[dict]) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(packets, indent=1))
-        os.replace(tmp, self.path)
+        self.store.write(self.name, json.dumps(packets, indent=1))
 
     def enqueue(self, packet: dict) -> None:
         packets = [p for p in self.pending() if p["packet_id"] != packet["packet_id"]]

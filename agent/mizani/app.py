@@ -19,11 +19,21 @@ from pydantic import BaseModel
 
 from . import atoms, explain, proof, sexpr
 from .atoms import AtomError, IdGen, ReadingKind, Site
-from .engine import Engine
+
+# Runtime selection: PeTTa locally (Omega's own runtime on SWI-Prolog),
+# hyperon on Vercel serverless (pure pip, identical NAL numbers).
+_RUNTIME = os.environ.get("MIZANI_RUNTIME") or (
+    "hyperon" if os.environ.get("VERCEL") else "petta"
+)
+if _RUNTIME == "hyperon":
+    from .engine_hyperon import Engine
+else:
+    from .engine import Engine
 from .jev import JevClient
 from .memory import Memory
 from .outbox import Outbox
 from .reasoner import Reasoner
+from .store import make_store
 from .schemas import (
     ConnectivityInput,
     ContestInput,
@@ -39,59 +49,55 @@ MEMORY_DIR = Path(os.environ.get("MIZANI_MEMORY_DIR", Path(__file__).resolve().p
 class AgentState:
     def __init__(self, role: str, memory_dir: Path | None = None, peer: str | None = None):
         self.role = role
-        self.memory_dir = Path(memory_dir or MEMORY_DIR)
-        self.memory_dir.mkdir(parents=True, exist_ok=True)
+        self.store = make_store(role, memory_dir or MEMORY_DIR)
         self.engine = Engine(role)
-        self.memory = Memory(self.engine, self.memory_dir, role)
+        self.memory = Memory(self.engine, self.store, role)
         self.memory.replay()
         self.reasoner = Reasoner(self.memory)
         self.idgen = IdGen(self._load_ids(), tag="C" if role == "community" else "F")
         self.decisions: dict[str, dict] = self.memory.load_decisions()
         self.referrals: dict[str, dict] = self._load_referrals()
         self.jev = JevClient()
-        self.outbox = Outbox(self.memory_dir, peer) if role == "community" else None
+        self.outbox = Outbox(self.store, peer) if role == "community" else None
         self.patches: dict[str, dict] = {}
 
     # ------------------------------------------------- persistence helpers
 
-    def _ids_path(self) -> Path:
-        return self.memory_dir / f"ids-{self.role}.json"
+    def _ids_name(self) -> str:
+        return f"ids-{self.role}.json"
 
     def _load_ids(self) -> dict[str, int]:
-        if self._ids_path().exists():
-            try:
-                return json.loads(self._ids_path().read_text())
-            except json.JSONDecodeError:
-                return {}
-        return {}
+        try:
+            return json.loads(self.store.read(self._ids_name()) or "{}")
+        except json.JSONDecodeError:
+            return {}
 
     def save_ids(self) -> None:
-        self._ids_path().write_text(json.dumps(self.idgen.state()))
+        self.store.write(self._ids_name(), json.dumps(self.idgen.state()))
 
     def next_id(self, prefix: str) -> str:
         nid = self.idgen.next(prefix)
         self.save_ids()
         return nid
 
-    def _referrals_path(self) -> Path:
-        return self.memory_dir / f"referrals-{self.role}.jsonl"
+    def _referrals_name(self) -> str:
+        return f"referrals-{self.role}.jsonl"
 
     def _load_referrals(self) -> dict[str, dict]:
         out: dict[str, dict] = {}
-        p = self._referrals_path()
-        if p.exists():
-            for line in p.read_text().splitlines():
-                line = line.strip()
-                if line:
-                    r = json.loads(line)
-                    out[r["referral_id"]] = r
+        for line in self.store.read(self._referrals_name()).splitlines():
+            line = line.strip()
+            if line:
+                r = json.loads(line)
+                out[r["referral_id"]] = r
         return out
 
     def save_referral(self, referral: dict) -> None:
         self.referrals[referral["referral_id"]] = referral
-        tmp = self._referrals_path().with_suffix(".tmp")
-        tmp.write_text("\n".join(json.dumps(r) for r in self.referrals.values()) + "\n")
-        os.replace(tmp, self._referrals_path())
+        self.store.write(
+            self._referrals_name(),
+            "\n".join(json.dumps(r) for r in self.referrals.values()) + "\n",
+        )
 
 
 def now_iso() -> str:

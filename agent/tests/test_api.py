@@ -65,7 +65,7 @@ def agents(tmp_path_factory):
     mem = tmp_path_factory.mktemp("mem")
     # facility remembers Amina's earlier visits before the agents start
     lines = "".join(f"(event 2026-10-02T08:00:00 add {a})\n" for a in FACILITY_MEMORY)
-    (mem / "facility.metta").write_text(lines)
+    (mem / "log-facility.jsonl").write_text(lines)
     env = dict(
         os.environ,
         PETTA_PATH=str(AGENT / "vendor" / "petta"),
@@ -102,7 +102,7 @@ def test_health(agents):
     assert hc["role"] == "community" and hc["pack"] == "edge-v1"
     assert hf["role"] == "facility" and hf["pack"] == "full-v1"
     assert hc["omega_commit"] == hf["omega_commit"] == "31ff0aad"
-    assert hc["petta"] == "v1.0.4"
+    assert hc["petta"] in {"v1.0.4", "hyperon-0.2.10 (serverless runtime)"}
 
 
 def test_rules_listed(agents):

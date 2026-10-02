@@ -34,7 +34,7 @@ def test_seed_scenarios(tmp_path):
     assert by_mother["M-WANJIKU"]["reconciled"]["level"] == "normal"
     assert by_mother["M-NAFULA"]["reconciled"]["level"] == "urgent"
 
-    log = (tmp_path / "facility.metta").read_text()
+    log = (tmp_path / "log-facility.jsonl").read_text()
     # Amina's 14-week memory is seeded; no current referral for her
     assert "(encounter E-03 M-AMINA" in log
     assert "(reading R-01 E-03 sbp 116)" in log

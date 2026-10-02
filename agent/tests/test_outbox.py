@@ -7,6 +7,7 @@ import httpx
 import pytest
 
 from mizani.outbox import Outbox
+from mizani.store import LocalStore
 
 
 def make_transport(calls: list[str], fail: bool = False):
@@ -20,7 +21,7 @@ def make_transport(calls: list[str], fail: bool = False):
 
 
 def test_enqueue_dedupes_and_removes(tmp_path):
-    ob = Outbox(tmp_path, "http://peer")
+    ob = Outbox(LocalStore(tmp_path), "http://peer")
     ob.enqueue({"packet_id": "PK-1", "x": 1})
     ob.enqueue({"packet_id": "PK-1", "x": 2})
     assert ob.pending() == [{"packet_id": "PK-1", "x": 2}]
@@ -29,7 +30,7 @@ def test_enqueue_dedupes_and_removes(tmp_path):
 
 
 def test_offline_flush_is_noop(tmp_path):
-    ob = Outbox(tmp_path, "http://peer")
+    ob = Outbox(LocalStore(tmp_path), "http://peer")
     ob.enqueue({"packet_id": "PK-1"})
     assert asyncio.run(ob.flush()) == []  # offline by default
     ob.set_online(True)
@@ -39,7 +40,7 @@ def test_offline_flush_is_noop(tmp_path):
 
 def test_flush_syncs_and_clears(tmp_path):
     calls: list[str] = []
-    ob = Outbox(tmp_path, "http://peer")
+    ob = Outbox(LocalStore(tmp_path), "http://peer")
     ob.set_online(True)
     ob.enqueue({"packet_id": "PK-1"})
     ob.enqueue({"packet_id": "PK-2"})
@@ -53,7 +54,7 @@ def test_flush_syncs_and_clears(tmp_path):
 
 def test_flush_keeps_queue_when_peer_down(tmp_path):
     calls: list[str] = []
-    ob = Outbox(tmp_path, "http://peer")
+    ob = Outbox(LocalStore(tmp_path), "http://peer")
     ob.set_online(True)
     ob.enqueue({"packet_id": "PK-1"})
     client = httpx.AsyncClient(transport=make_transport(calls, fail=True))

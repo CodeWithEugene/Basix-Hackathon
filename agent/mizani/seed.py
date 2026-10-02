@@ -23,9 +23,10 @@ from . import atoms
 from .app import AgentState, record_facility_encounter, record_visit, sync_packet
 from .atoms import Site
 from .schemas import FacilityEncounterInput, VisitInput
+from .store import make_store
 
 MEMORY_DIR = Path(os.environ.get("MIZANI_MEMORY_DIR", Path(__file__).resolve().parent.parent / "memory"))
-PACKETS = MEMORY_DIR / "seed-packets.json"
+PACKETS_NAME = "seed-packets.json"
 
 MOTHERS = [
     ("M-AMINA", 27, 2, 1),
@@ -91,21 +92,18 @@ FACILITY_C = {
 
 
 def truncate() -> None:
-    MEMORY_DIR.mkdir(parents=True, exist_ok=True)
-    for p in MEMORY_DIR.glob("*"):
-        if p.is_file():
-            p.unlink()
+    make_store("seed", MEMORY_DIR).delete_all()
 
 
 def seed_community() -> None:
+    store = make_store("community", MEMORY_DIR)
     state = AgentState("community", memory_dir=MEMORY_DIR, peer=None)
     for mid, age, g, p in MOTHERS:
         state.memory.apply("add", atoms.mother(mid, age, g, p))
-    packets = []
     for visit in (VISIT_B, VISIT_C):
         record_visit(state, VisitInput(**visit))
     packets = state.outbox.pending()
-    PACKETS.write_text(json.dumps(packets, indent=1))
+    store.write(PACKETS_NAME, json.dumps(packets, indent=1))
     # the demo treats B and C as synced long ago; the community outbox is
     # empty and offline, and Amina's encounter is not created yet
     for p in packets:
@@ -115,12 +113,13 @@ def seed_community() -> None:
 
 
 def seed_facility() -> None:
+    store = make_store("facility", MEMORY_DIR)
     state = AgentState("facility", memory_dir=MEMORY_DIR, peer=None)
     for mid, age, g, p in MOTHERS:
         state.memory.apply("add", atoms.mother(mid, age, g, p))
     for a in AMINA_MEMORY + WANJIKU_MEMORY:
         state.memory.apply("add", a)
-    packets = json.loads(PACKETS.read_text())
+    packets = json.loads(store.read(PACKETS_NAME) or "[]")
     for packet, facility_in in zip(packets, (FACILITY_B, FACILITY_C)):
         r = sync_packet(state, packet)
         record_facility_encounter(

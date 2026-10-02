@@ -18,6 +18,7 @@ petta = { path = "vendor/petta", editable = true }
 
 [dependency-groups]
 dev = [
+    "hyperon==0.2.10",
     "pytest>=8",
     "pytest-cov>=5",
 ]

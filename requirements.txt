@@ -1,0 +1,5 @@
+hyperon==0.2.10
+fastapi==0.142.2
+pydantic==2.13.5
+httpx>=0.28
+typesafe-sdk==0.7.2
