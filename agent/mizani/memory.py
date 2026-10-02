@@ -57,6 +57,19 @@ class Memory:
         self.store.append(self.log_name, f"(event {ts} {op} {atom})\n")
         self.count += 1
 
+    def apply_many(self, atoms: list[str]) -> None:
+        """Apply many adds with ONE store write (rate-limit friendly)."""
+        ts = datetime.datetime.now().isoformat(timespec="seconds")
+        lines = []
+        for atom in atoms:
+            if self.exists(atom):
+                continue
+            self.engine.run(f"!(add-atom &self {atom})")
+            lines.append(f"(event {ts} add {atom})\n")
+            self.count += 1
+        if lines:
+            self.store.append(self.log_name, "".join(lines))
+
     def exists(self, atom: str) -> bool:
         out = self.engine.run(f"!(collapse (match &self {atom} true))")
         return bool(out) and out[0] not in {"", "()"}

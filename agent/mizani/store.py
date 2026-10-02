@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from pathlib import Path
 
 import httpx
@@ -82,11 +83,22 @@ class EdgeConfigStore:
         return json.dumps(value) if value is not None else ""
 
     def write(self, name: str, text: str) -> None:
-        r = self.client.patch(
-            f"{EDGE_API}/{self.config_id}/items",
-            json={"items": [{"operation": "upsert", "key": self._key(name), "value": text}]},
-        )
-        r.raise_for_status()
+        self._write_with_retry(self._key(name), text)
+
+    def _write_with_retry(self, key: str, text: str, attempts: int = 4) -> None:
+        """Retry Edge Config's 429 write rate limit with backoff."""
+        delay = 0.5
+        for i in range(attempts):
+            r = self.client.patch(
+                f"{EDGE_API}/{self.config_id}/items",
+                json={"items": [{"operation": "upsert", "key": key, "value": text}]},
+            )
+            if r.status_code == 429 and i < attempts - 1:
+                time.sleep(delay)
+                delay *= 2.5
+                continue
+            r.raise_for_status()
+            return
 
     def append(self, name: str, text: str) -> None:
         self.write(name, self.read(name) + text)

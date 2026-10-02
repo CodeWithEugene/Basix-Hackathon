@@ -116,27 +116,22 @@ def si_readings(readings: list) -> list:
     return []
 
 
-def apply_vitals(state: AgentState, eid: str, readings: list, device: str,
-                 treatment: str | None, treatment_at: str | None) -> list[str]:
-    """Write reading + prov atoms (plus computed shock index). Returns atom ids."""
-    atoms_written = []
+def build_vitals_atoms(state: AgentState, eid: str, readings: list, device: str,
+                       treatment: str | None, treatment_at: str | None) -> list[str]:
+    """Build reading + prov atoms (plus computed shock index)."""
+    out = []
     all_readings = list(readings) + [
         type("R", (), r) for r in si_readings(readings)
     ]
     for r in all_readings:
         rid = state.next_id("R-")
         kind = ReadingKind(r.kind)
-        a1 = atoms.reading(rid, eid, kind, r.value)
-        a2 = atoms.prov(rid, getattr(r, "repeated", False), treatment or "none", device)
-        for a in (a1, a2):
-            state.memory.apply("add", a)
-            atoms_written.append(a)
+        out.append(atoms.reading(rid, eid, kind, r.value))
+        out.append(atoms.prov(rid, getattr(r, "repeated", False), treatment or "none", device))
     if treatment and treatment != "none":
         tid = state.next_id("T-")
-        a = atoms.treatment(tid, eid, treatment, treatment_at or now_iso())
-        state.memory.apply("add", a)
-        atoms_written.append(a)
-    return atoms_written
+        out.append(atoms.treatment(tid, eid, treatment, treatment_at or now_iso()))
+    return out
 
 
 def finalize_decision(state: AgentState, decision: dict) -> dict:
@@ -168,14 +163,11 @@ def record_visit(state: AgentState, visit: VisitInput) -> dict:
         atoms.witness(eid, "community"),
         atoms.in_referral(ref, eid),
     ]
-    for a in encounter_atoms:
-        state.memory.apply("add", a)
-    encounter_atoms += apply_vitals(state, eid, visit.readings, visit.device, None, None)
+    encounter_atoms += build_vitals_atoms(state, eid, visit.readings, visit.device, None, None)
     for s in visit.signs:
         sid = state.next_id("S-")
-        a = atoms.sign(sid, eid, s.name, s.status, s.source)
-        state.memory.apply("add", a)
-        encounter_atoms.append(a)
+        encounter_atoms.append(atoms.sign(sid, eid, s.name, s.status, s.source))
+    state.memory.apply_many(encounter_atoms)
 
     did = state.next_id("D-")
     decision = state.reasoner.run_pipeline(ref, mid, did)
@@ -216,9 +208,7 @@ def sync_packet(state: AgentState, packet: dict) -> dict:
 
     ref = packet["referral_id"]
     mid = packet["mother"]["id"]
-    for a in packet["atoms"]:
-        state.memory.apply("add", a)
-    state.memory.apply("add", atoms.referral_event(ref, mid, pid))
+    state.memory.apply_many(packet["atoms"] + [atoms.referral_event(ref, mid, pid)])
 
     referral = {
         "referral_id": ref,
@@ -251,15 +241,12 @@ def record_facility_encounter(state: AgentState, inp: FacilityEncounterInput) ->
         atoms.witness(eid, "facility"),
         atoms.in_referral(inp.referral_id, eid),
     ]
-    for a in new_atoms:
-        state.memory.apply("add", a)
-    new_atoms += apply_vitals(state, eid, inp.readings, inp.device,
-                              inp.treatment, inp.treatment_at)
+    new_atoms += build_vitals_atoms(state, eid, inp.readings, inp.device,
+                                    inp.treatment, inp.treatment_at)
     for s in inp.signs:
         sid = state.next_id("S-")
-        a = atoms.sign(sid, eid, s.name, s.status, s.source)
-        state.memory.apply("add", a)
-        new_atoms.append(a)
+        new_atoms.append(atoms.sign(sid, eid, s.name, s.status, s.source))
+    state.memory.apply_many(new_atoms)
 
     referral["encounters"]["facility"] += new_atoms
     state.save_referral(referral)
