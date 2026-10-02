@@ -42,6 +42,17 @@ app.mount("/api/community", community)
 app.mount("/api/facility", facility)
 
 
+
+
+@app.get("/api/blobtest")
+def blob_test():
+    """Probe Vercel Blob OIDC auth end to end (PUT then GET)."""
+    from mizani.blobstore import BlobClient
+    b = BlobClient()
+    out = b.put("mizani/probe.txt", b"hello from mizani")
+    got = b.get("mizani/probe.txt")
+    return {"put": out.get("url", "")[:80], "get": got}
+
 @app.get("/api/health")
 def agents_health():
     return {
