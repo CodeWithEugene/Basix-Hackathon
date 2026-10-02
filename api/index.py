@@ -5,9 +5,14 @@ Both Omega agents (community + facility) run in this deployment, mounted at
 space, exactly like the two local PeTTa processes. State lives in Vercel
 Edge Config.
 """
+import os
 import pathlib
 import sys
 from contextlib import asynccontextmanager
+
+# hyperon writes its MeTTa module catalog under $HOME; Vercel's filesystem
+# is read-only except /tmp, so point HOME there before hyperon initializes.
+os.environ.setdefault("HOME", "/tmp")
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "agent"))
