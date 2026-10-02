@@ -1,0 +1,27 @@
+# Local agent tooling state
+.claude-flow/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+web/test-results/
+web/playwright-report/
+
+# Agent runtime memory (regenerate with `make seed`)
+agent/memory/*.metta
+
+# OS
+.DS_Store
