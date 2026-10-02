@@ -344,6 +344,14 @@ def create_app(role: str | None = None) -> FastAPI:
     app = FastAPI(title=f"Mizani {role} agent", lifespan=lifespan)
     app.state.agent = state
 
+    @app.middleware("http")
+    async def flush_store_writes(request, call_next):
+        """Coalesce Edge Config writes to one PATCH per key per request."""
+        try:
+            return await call_next(request)
+        finally:
+            state.store.flush()
+
     def get_state() -> AgentState:
         return state
 

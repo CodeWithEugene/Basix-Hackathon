@@ -46,12 +46,19 @@ class LocalStore:
             if p.is_file():
                 p.unlink()
 
+    def flush(self) -> None:
+        return None
+
 
 class EdgeConfigStore:
     """Vercel Edge Config backend.
 
     Names map to keys as `mz/<name>`. Auth: a Vercel API token with
     read/write access (VERCEL_API_TOKEN env).
+
+    Writes are buffered in memory and flushed once per key at the end of
+    each request (flush()), because Edge Config has a strict write rate
+    limit and the agent issues many small writes per request.
     """
 
     def __init__(self, config_id: str | None = None, token: str | None = None,
@@ -63,12 +70,15 @@ class EdgeConfigStore:
             headers={"authorization": f"Bearer {self.token}"},
             timeout=15.0,
         )
+        self._buffer: dict[str, str] = {}
 
     def _key(self, name: str) -> str:
         # Edge Config keys: alphanumeric, _ and - only (no dots or slashes)
         return f"{self.prefix}--{name.replace('/', '-').replace('.', '-')}"
 
     def read(self, name: str) -> str:
+        if name in self._buffer:
+            return self._buffer[name]
         r = self.client.get(
             f"{EDGE_API}/{self.config_id}/item/{self._key(name)}")
         if r.status_code in {401, 403, 404}:
@@ -83,7 +93,13 @@ class EdgeConfigStore:
         return json.dumps(value) if value is not None else ""
 
     def write(self, name: str, text: str) -> None:
-        self._write_with_retry(self._key(name), text)
+        self._buffer[name] = text  # coalesced and sent on flush()
+
+    def flush(self) -> None:
+        """Write every dirty key once, last value wins."""
+        for name, text in self._buffer.items():
+            self._write_with_retry(self._key(name), text)
+        self._buffer.clear()
 
     def _write_with_retry(self, key: str, text: str, attempts: int = 4) -> None:
         """Retry Edge Config's 429 write rate limit with backoff."""
@@ -118,6 +134,7 @@ class EdgeConfigStore:
         ]
         if not items:
             return
+        self._buffer.clear()
         r = self.client.patch(
             f"{EDGE_API}/{self.config_id}/items",
             json={"items": items},
