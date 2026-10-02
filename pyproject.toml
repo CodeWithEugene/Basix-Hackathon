@@ -3,6 +3,13 @@ name = "mizani-agents"
 version = "0.1.0"
 description = "Mizani Omega agents as Vercel serverless functions"
 requires-python = ">=3.12,<3.13"
+dependencies = [
+    "hyperon==0.2.10",
+    "fastapi==0.142.2",
+    "pydantic==2.13.5",
+    "httpx>=0.28",
+    "typesafe-sdk==0.7.2",
+]
 
 [tool.vercel]
 entrypoint = "api.index:app"
