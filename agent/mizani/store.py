@@ -143,8 +143,50 @@ class EdgeConfigStore:
             r.raise_for_status()
 
 
+class MemoryStore:
+    """Per-instance in-memory store (demo mode for serverless).
+
+    Seeds from Edge Config on first read (read-only; its seeded scenario data
+    is already written there) and keeps all runtime writes in memory. The
+    demo's sync travels over HTTPS between the two agents, so a single user
+    session stays coherent while one warm instance serves the flow.
+    """
+
+    def __init__(self, seed_store=None):
+        self.data: dict[str, str] = {}
+        self.seed = seed_store
+
+    def read(self, name: str) -> str:
+        if name in self.data:
+            return self.data[name]
+        if self.seed is not None:
+            value = self.seed.read(name)
+            self.data[name] = value
+            return value
+        return ""
+
+    def write(self, name: str, text: str) -> None:
+        self.data[name] = text
+
+    def append(self, name: str, text: str) -> None:
+        self.data[name] = self.read(name) + text
+
+    def delete_all(self, prefix: str = "") -> None:
+        self.data.clear()
+        # seed content in Edge Config is left untouched
+
+    def flush(self) -> None:
+        return None
+
+
 def make_store(role: str, memory_dir: Path | None = None):
     """Pick the backend from the environment."""
-    if os.environ.get("MIZANI_STORE") == "edgeconfig" or os.environ.get("EDGE_CONFIG_ID"):
+    mode = os.environ.get("MIZANI_STORE", "")
+    if mode == "memory" or (os.environ.get("VERCEL") and mode != "edgeconfig"):
+        seed = None
+        if os.environ.get("EDGE_CONFIG_ID"):
+            seed = EdgeConfigStore()
+        return MemoryStore(seed_store=seed)
+    if mode == "edgeconfig" or os.environ.get("EDGE_CONFIG_ID"):
         return EdgeConfigStore()
     return LocalStore(memory_dir or Path("memory"))
