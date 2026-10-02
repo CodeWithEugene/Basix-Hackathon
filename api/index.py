@@ -37,6 +37,16 @@ async def lifespan(app: FastAPI):
         await comm_state.outbox.stop_loop()
 
 
+# In-process sync bridge: the serverless demo hosts both agents in one
+# process, so the community outbox delivers packets directly into the
+# facility agent's memory (the same dict the inbox reads). The two-process
+# local deployment still syncs over HTTP.
+from mizani.app import sync_packet as _facility_sync  # noqa: E402
+
+community.state.agent.outbox.handler = lambda packet: _facility_sync(
+    facility.state.agent, packet
+)
+
 app = FastAPI(title="Mizani agents", lifespan=lifespan)
 app.mount("/api/community", community)
 app.mount("/api/facility", facility)

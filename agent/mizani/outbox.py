@@ -19,6 +19,7 @@ class Outbox:
         self.name = "outbox-community.json"
         self.peer = (peer_url or "").rstrip("/") or None
         self.online = False
+        self.handler = None  # optional in-process delivery callback (serverless demo)
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
 
@@ -43,7 +44,24 @@ class Outbox:
         self.online = online
 
     async def flush(self, client: httpx.AsyncClient | None = None) -> list[str]:
-        """Try to sync every pending packet. Returns synced packet ids."""
+        """Try to sync every pending packet. Returns synced packet ids.
+
+        When a handler is registered (the serverless demo hosts both agents
+        in one process), packets are delivered in process, which is exactly
+        the state the facility inbox reads.
+        """
+        if self.handler is not None:
+            if not self.online:
+                return []
+            synced: list[str] = []
+            for packet in self.pending():
+                try:
+                    self.handler(packet)
+                    synced.append(packet["packet_id"])
+                    self.remove(packet["packet_id"])
+                except Exception:
+                    break
+            return synced
         if not self.online or not self.peer:
             return []
         synced: list[str] = []
