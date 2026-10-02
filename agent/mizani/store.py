@@ -152,8 +152,8 @@ class MemoryStore:
     session stays coherent while one warm instance serves the flow.
     """
 
-    def __init__(self, seed_store=None):
-        self.data: dict[str, str] = {}
+    def __init__(self, seed_store=None, seed_snapshot: dict[str, str] | None = None):
+        self.data: dict[str, str] = dict(seed_snapshot or {})
         self.seed = seed_store
 
     def read(self, name: str) -> str:
@@ -183,10 +183,11 @@ def make_store(role: str, memory_dir: Path | None = None):
     """Pick the backend from the environment."""
     mode = os.environ.get("MIZANI_STORE", "")
     if mode == "memory" or (os.environ.get("VERCEL") and mode != "edgeconfig"):
-        seed = None
-        if os.environ.get("EDGE_CONFIG_ID"):
-            seed = EdgeConfigStore()
-        return MemoryStore(seed_store=seed)
+        snapshot: dict[str, str] = {}
+        snap_path = Path(__file__).resolve().parent / "seed_snapshot.json"
+        if snap_path.exists():
+            snapshot = json.loads(snap_path.read_text())
+        return MemoryStore(seed_snapshot=snapshot)
     if mode == "edgeconfig" or os.environ.get("EDGE_CONFIG_ID"):
         return EdgeConfigStore()
     return LocalStore(memory_dir or Path("memory"))
