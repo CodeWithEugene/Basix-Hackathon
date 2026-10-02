@@ -1,19 +1,20 @@
 """Storage backends for agent state.
 
 LocalStore: files under the memory dir (development, one process per role).
-BlobStore: Vercel Blob over its REST API (serverless deployment, where the
-filesystem is ephemeral and state must be shared across function instances).
-Both implement the same tiny file-shaped API; appends read-modify-write,
-which is fine at demo scale (single user, a few KB per file).
+EdgeConfigStore: Vercel Edge Config over its REST API (serverless deployment,
+where the filesystem is ephemeral and state must be shared across function
+instances). Both implement the same tiny file-shaped API; appends
+read-modify-write, which is fine at demo scale.
 """
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
 import httpx
 
-BLOB_API = "https://blob.vercel-storage.com"
+EDGE_API = "https://api.vercel.com/v1/edge-config"
 
 
 class LocalStore:
@@ -45,40 +46,45 @@ class LocalStore:
                 p.unlink()
 
 
-class BlobStore:
-    """Vercel Blob backend. Token from BLOB_READ_WRITE_TOKEN."""
+class EdgeConfigStore:
+    """Vercel Edge Config backend.
 
-    def __init__(self, prefix: str = "mizani", token: str | None = None):
-        self.token = token or os.environ.get("BLOB_READ_WRITE_TOKEN", "")
+    Names map to keys as `mz/<name>`. Auth: a Vercel API token with
+    read/write access (VERCEL_API_TOKEN env).
+    """
+
+    def __init__(self, config_id: str | None = None, token: str | None = None,
+                 prefix: str = "mz"):
+        self.config_id = config_id or os.environ.get("EDGE_CONFIG_ID", "")
+        self.token = token or os.environ.get("VERCEL_API_TOKEN", "")
         self.prefix = prefix.strip("/")
         self.client = httpx.Client(
             headers={"authorization": f"Bearer {self.token}"},
             timeout=15.0,
         )
 
-    def _path(self, name: str) -> str:
-        return f"{self.prefix}/{name}"
+    def _key(self, name: str) -> str:
+        # Edge Config keys: alphanumeric, _ and - only (no dots or slashes)
+        return f"{self.prefix}--{name.replace('/', '-').replace('.', '-')}"
 
     def read(self, name: str) -> str:
         r = self.client.get(
-            f"{BLOB_API}/{self._path(name)}",
-            params={"download": "1"},
-            headers={"x-api-version": "7"},
-        )
+            f"{EDGE_API}/{self.config_id}/item/{self._key(name)}")
         if r.status_code in {401, 403, 404}:
             return ""
         r.raise_for_status()
-        return r.text
+        try:
+            value = r.json().get("value")
+        except json.JSONDecodeError:
+            return ""
+        if isinstance(value, str):
+            return value
+        return json.dumps(value) if value is not None else ""
 
     def write(self, name: str, text: str) -> None:
-        r = self.client.put(
-            f"{BLOB_API}/{self._path(name)}",
-            params={"addRandomSuffix": "0"},
-            headers={
-                "x-api-version": "7",
-                "content-type": "application/octet-stream",
-            },
-            content=text.encode(),
+        r = self.client.patch(
+            f"{EDGE_API}/{self.config_id}/items",
+            json={"items": [{"operation": "upsert", "key": self._key(name), "value": text}]},
         )
         r.raise_for_status()
 
@@ -86,26 +92,30 @@ class BlobStore:
         self.write(name, self.read(name) + text)
 
     def delete_all(self, prefix: str = "") -> None:
-        r = self.client.get(
-            BLOB_API,
-            params={"prefix": f"{self.prefix}/{prefix}", "limit": "1000"},
-            headers={"x-api-version": "7"},
-        )
-        if r.status_code != 200:
+        names = [
+            "log-community.jsonl", "log-facility.jsonl",
+            "decisions-community.jsonl", "decisions-facility.jsonl",
+            "referrals-facility.jsonl", "referrals-community.jsonl",
+            "ids-community.json", "ids-facility.json",
+            "outbox-community.json", "seed-packets.json",
+        ]
+        items = [
+            {"operation": "delete", "key": self._key(n)}
+            for n in names
+            if not prefix or n.startswith(prefix)
+        ]
+        if not items:
             return
-        blobs = r.json().get("blobs", [])
-        if not blobs:
-            return
-        self.client.request(
-            "DELETE",
-            BLOB_API,
-            headers={"x-api-version": "7", "content-type": "application/json"},
-            json={"pathnames": [b["pathname"] for b in blobs]},
+        r = self.client.patch(
+            f"{EDGE_API}/{self.config_id}/items",
+            json={"items": items},
         )
+        if r.status_code not in {200, 204, 404}:
+            r.raise_for_status()
 
 
 def make_store(role: str, memory_dir: Path | None = None):
     """Pick the backend from the environment."""
-    if os.environ.get("MIZANI_STORE") == "blob" or os.environ.get("BLOB_READ_WRITE_TOKEN"):
-        return BlobStore(prefix=os.environ.get("MIZANI_BLOB_PREFIX", "mizani"))
+    if os.environ.get("MIZANI_STORE") == "edgeconfig" or os.environ.get("EDGE_CONFIG_ID"):
+        return EdgeConfigStore()
     return LocalStore(memory_dir or Path("memory"))

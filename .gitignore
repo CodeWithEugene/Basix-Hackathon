@@ -25,3 +25,5 @@ agent/memory/
 
 # OS
 .DS_Store
+.vercel
+.env*
